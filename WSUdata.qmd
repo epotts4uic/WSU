@@ -1,0 +1,336 @@
+---
+title: "WSU_Data_Analysis"
+subtitle: |
+    | UIC CUPPA - Capstone 
+    | Spring 2024
+format: pdf
+code-overflow: wrap
+editor: visual
+---
+
+## Libraries and Data
+
+```{r}
+#| echo: true
+#| warning: false
+#| output: false
+
+library(readr)
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(purrr)
+library(knitr)
+library(kableExtra)
+
+vendor <- read_csv("~/Desktop/Capstone/data/vendor.csv")
+bea <- read_excel("~/Desktop/Capstone/data/table.xlsx")
+qcew <- read_csv("~/Desktop/Capstone/data/qcew.csv")
+```
+
+## Vendor Data
+
+Vendor data = WSU provided data on vendor partners with existing contact information available.
+
+```{r}
+vendor$capabilities <- tolower(vendor$CAPABILITIES)
+vendor$category <- tolower(vendor$CATEGORY)
+```
+
+### Search Keywords for Vendor Capabilities
+
+Reviewing the current vendor list provided by WSU to understand where they already have capabilities in the local community.
+
+```{r}
+#| code-overflow: wrap
+
+vendor <- vendor %>%
+  mutate(it_vendor = case_when(
+    str_detect(capabilities, 
+               "it|information|technology|software|computer|
+               computers|computing|tech") ~ 1,
+    str_detect(category, 
+               "it|information|technology|software|computer|
+               computers|computing|tech") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(cust_vendor = case_when(
+    str_detect(capabilities,
+               "custodial|janitorial|maintenance|plumbing|
+               cleaning|custodian|janitor|plumber") ~ 1,
+    str_detect(category, 
+               "custodial|janitorial|maintenance|plumbing|
+               cleaning|custodian|janitor|plumber") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(ground_vendor = case_when(
+    str_detect(capabilities, 
+               "ground|grounds|landscape|landscaping|
+               lawn|snow|garden|gardening") ~ 1,
+    str_detect(category, 
+               "ground|grounds|landscape|landscaping|
+               lawn|snow|garden|gardening") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(dei_vendor = case_when(
+    str_detect(capabilities, 
+               "dei|diversity|equity|inclusion|diverse|inclusive") ~ 1,
+    str_detect(category,
+               "dei|diversity|equity|inclusion|diverse|inclusive") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(food_vendor = case_when(
+    str_detect(capabilities, 
+               "food|catering|caterer|foods|cater|nutrition") ~ 1,
+    str_detect(category, 
+               "food|catering|caterer|foods|cater|nutrition") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(secure_vendor = case_when(
+    str_detect(capabilities, 
+               "secure|security|surveillance|building security|guard") ~ 1,
+    str_detect(category, 
+               "secure|security|surveillance|building security|guard") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(law_vendor = case_when(
+    str_detect(capabilities, 
+               "legal|lawyer|litigation|lawyers|law") ~ 1,
+    str_detect(category, 
+               "legal|lawyer|litigation|lawyers|law") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(hvac_vendor = case_when(
+    str_detect(capabilities, 
+               "hvac|heating|cooling|mechanics|mechanical") ~ 1,
+    str_detect(category, 
+               "hvac|heating|cooling|mechanics|mechanical") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(electric_vendor = case_when(
+    str_detect(capabilities, 
+               "electric|electrical|electrician|lighting") ~ 1,
+    str_detect(category, 
+               "electric|electrical|electrician|lighting") ~ 1,
+    TRUE ~ 0
+  ))
+
+vendor <- vendor %>%
+  mutate(patient_vendor = case_when(
+    str_detect(capabilities, 
+               "census|ai|predictive|prediction") ~ 1,
+    str_detect(category, 
+               "census|ai|predictive|prediction") ~ 1,
+    TRUE ~ 0
+  ))
+
+summarized_data <- vendor %>%
+  summarize(across(30:39, sum, .names = "{col}_total"))
+summarized_data <- t(summarized_data)
+```
+
+```{r summary_table, results='asis'}
+
+kable(summarized_data, align = "c", caption = "Summary of Columns 30-39") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                full_width = FALSE)
+
+```
+
+## BEA Data
+
+Bureau of Economic Analysis - U.S. Department of Commerce https://www.bea.gov/industry/input-output-accounts-data Total inputs by industry required (directly and indirectly) in order to deliver one dollar of industry output to final users
+
+The value of the final goods and services produced in the United States is the gross domestic product. The percentage that GDP grew (or shrank) from one period to another is an important way for Americans to gauge how their economy is doing. The United States' GDP is also watched around the world as an economic barometer.
+
+"Total inputs by industry required (directly and indirectly) in order to deliver one dollar of industry output to final users," -- this provides insights into the economic interconnectedness and dependencies between industries within an economy. This concept is analyzed through input-output tables, which understand the flow of goods and services between industries and sectors.
+
+The values in the data represent the total inputs required by each industry, both directly and indirectly, to produce one dollar of industry output that eventually reaches final users. This concept is often referred to as "total requirements coefficients" or "total requirements per dollar of output."
+
+Assuming that output for a hospital is equal to hospital spend, this assumes that the budget they are spending is the hospital profit. The total operational spend for all hospitals in Illinois is \$17,000,000,000. There are about 210 hospitals - so the average operational spend is \$80,952,381 per hospital. This will be used as a multiplier in understanding the input-output data.
+
+### Highest Inputs for Output
+
+```{r}
+
+hospitals <- select(bea, "Industry", "Industry Description", "Hospitals")
+
+top_inputs <- bea %>%
+  select("Industry", "Industry Description", "Hospitals") %>%
+  filter(!grepl("Hospitals", `Industry Description`)) %>%
+  arrange(desc(Hospitals))
+
+top_inputs$output <- top_inputs$Hospitals * 80952381
+options(scipen = 999)
+
+top_inputs
+
+```
+
+For example, Hospitals require \$0.086 worth of inputs from Administrative and support services to produce \$1.00 worth of output to final users. These inputs can come directly from other industries or indirectly through intermediate stages across the economy. With the multiplier, it can be understood that on average, hospitals spend \$6,977,220.95 on Administrative and support services from their budget annually.
+
+### Lowest Inputs for Output
+
+```{r}
+bottom_inputs <- bea %>%
+  select(Industry, `Industry Description`, Hospitals) %>%
+  filter(!grepl("Hospitals", `Industry Description`)) %>%
+  arrange(Hospitals)
+
+bottom_inputs$output <- bottom_inputs$Hospitals * 80952381
+options(scipen = 999)
+
+bottom_inputs
+```
+
+For example, Hospitals require \$0.000064 worth of inputs from Food and beverage stores to produce \$1.00 worth of output to final users. These inputs can come directly from other industries or indirectly through intermediate stages across the economy. With the multiplier, it can be understood that investing in Food and beverage stores will result in an output for the hospital of \$5,180.95.
+
+## QCEW Data
+
+Quarterly Census of Employment and Wages - County level data https://www.bls.gov/cew/downloadable-data-files.htm
+
+The Quarterly Census of Employment and Wages (QCEW) program publishes a quarterly count of employment and wages reported by employers covering more than 95 percent of U.S. jobs, available at the county, MSA, state and national levels by industry.
+
+Filter data for Cook County for only metrics impacting the West Side neighborhoods:
+
+```{r}
+cook <- qcew %>%
+  filter(qcew$Area == "Cook County, Illinois")
+
+cook <- cook %>%
+  rename(Establishment_Count = `Establishment Count`)
+
+```
+
+### Concentrated Businesses
+
+```{r}
+top_bus <- cook %>%
+  filter(Ownership == "Private") %>%
+  select("Industry", "Establishment_Count") %>%
+  filter(!grepl("10 Total, all industries", Industry)) %>%
+  arrange(desc(Establishment_Count))
+top_bus
+```
+
+### Location Quotients
+
+Location Quotient (LQ): The location quotient for total wages/employment in a specific industry or occupation in a given area is calculated as the ratio of the proportion of total wages/employment in that industry or occupation in the area to the proportion of total wages/employment in the same industry or occupation at the national level.
+
+Interpretation:
+
+LQ \> 1: Indicates that the industry or occupation has a higher concentration or specialization in total wages/employment in the local area compared to the national average. A location quotient greater than 1 suggests a comparative advantage or specialization in total wages/employment in that industry or occupation. LQ = 1: Indicates that the industry or occupation is proportionately represented in total wages/employment in the local area compared to the national average. LQ \< 1: Indicates that the industry or occupation has a lower concentration or specialization in total wages/employment in the local area compared to the national average. A location quotient less than 1 suggests a comparative disadvantage or lack of specialization in total wages in that industry or occupation.
+
+Rename columns for ease in this analysis:
+
+```{r}
+cook <- cook %>%
+  rename(EmploymentLQ = "Employment Location Quotient Relative to U.S.") %>%
+  rename(WageLQ = "Total Wage Location Quotient Relative to U.S.")
+```
+
+```{r}
+specialize <- cook %>%
+  filter(Ownership == "Private") %>%
+  select("Industry", "EmploymentLQ") %>%
+  filter(!grepl("10 Total, all industries", Industry)) %>%
+  arrange(desc(EmploymentLQ))
+specialize
+```
+
+A relative employment location quotient greater than 1 suggests that, on average, industries or occupations in the area are more concentrated or specialized compared to the national average. Cook county is more specialized in financial activities, professional services, education, health, and service providing, etc.
+
+```{r}
+wage <- cook %>%
+  filter(Ownership == "Private") %>%
+  select("Industry", "WageLQ") %>%
+  filter(!grepl("10 Total, all industries", Industry)) %>%
+  arrange(desc(WageLQ))
+wage
+```
+
+The same industries appear when analyzing wages. A relative total wage location quotient greater than 1 suggests that, on average, industries or occupations in the area have higher total wages compared to the national average.
+
+```{r}
+wage_low <- cook %>%
+  filter(Ownership == "Private") %>%
+  select("Industry", "WageLQ") %>%
+  filter(!grepl("10 Total, all industries", Industry)) %>%
+  arrange(WageLQ)
+wage_low
+```
+
+A relative total wage location quotient less than 1 suggests that, on average, industries or occupations in the area have lower total wages compared to the national average. These industries show where Cook county is paying lower wages than national averages.
+
+# Tier II Vendors
+
+WSU is interested in learning more about vendors in their Tier II classification. Find vendors in West Side Zip Codes that are part of these NAICS for businesses.
+
+```{r, echo=FALSE}
+
+industry <- c("security_services",
+              "fire_services",
+              "food_distribution",
+              "ad_marketing",
+              "records",
+              "bus_consulting",
+              "furniture",
+              "photography",
+              "video_av")
+naics <- c(5616,
+           922160,
+           424490,
+           5418,
+           518210,
+           541611,
+           33712,
+           541922,
+           512110)
+
+tier2 <- cbind(industry, naics)
+
+print(tier2)
+```
+
+West Side United 10 Community Areas and Zip Codes
+
+```{r, echo=FALSE}
+zipcodes <- c(60634,
+              60644,
+              60622,
+              60624,
+              60612,
+              60608,
+              60606,
+              60635,
+              60639,
+              60641,
+              60647,
+              60651,
+              60607,
+              60623,
+              60642,
+              60616,
+              60610,
+              60661)
+
+zipcodes
+
+```
